@@ -18,11 +18,13 @@ internal static class TrayIcons
         [TrayState.Disconnected] = Color.FromArgb(0xFF, 0x4D, 0x4F),
     };
 
-    public static Dictionary<TrayState, Icon> Create()
-    {
-        int size = Math.Max(16, SystemInformation.SmallIconSize.Width);
-        return Palette.ToDictionary(entry => entry.Key, entry => Draw(entry.Key, entry.Value, size));
-    }
+    public static Dictionary<TrayState, Icon> Create() =>
+        Create(Math.Max(16, SystemInformation.SmallIconSize.Width));
+
+    public static Dictionary<TrayState, Icon> Create(int size) =>
+        Palette.ToDictionary(entry => entry.Key, entry => Draw(entry.Key, entry.Value, size));
+
+    public static Color ColorOf(TrayState state) => Palette[state];
 
     private static Icon Draw(TrayState state, Color color, int size)
     {

@@ -20,6 +20,16 @@ internal enum AgentState
 
 internal readonly record struct AgentInfo(string Name, AgentState State);
 
+internal static class AgentStates
+{
+    public static TrayState ToTrayState(this AgentState state) => state switch
+    {
+        AgentState.Blocked => TrayState.NeedsAttention,
+        AgentState.Working => TrayState.Working,
+        _ => TrayState.Idle,
+    };
+}
+
 internal sealed record HerdrSnapshot(bool Connected, IReadOnlyList<AgentInfo> Agents)
 {
     public static readonly HerdrSnapshot Disconnected = new(false, []);

@@ -13,6 +13,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
 
+    private StatusWallForm? _wall;
+    private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
     private TrayState? _shownState;
     private string _shownTooltip = string.Empty;
     private bool _polling;
@@ -21,6 +23,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext()
     {
         var menu = new ContextMenuStrip();
+        menu.Items.Add("Status", null, (_, _) => ShowWall());
         menu.Items.Add("Exit", null, (_, _) => Exit());
 
         _notifyIcon = new NotifyIcon { ContextMenuStrip = menu };
@@ -56,8 +59,31 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
+    /// <summary>Opens the status wall, or brings it back if it is already open.</summary>
+    private void ShowWall()
+    {
+        _wall ??= new StatusWallForm();
+        _wall.Apply(_snapshot);
+
+        if (!_wall.Visible)
+        {
+            _wall.Show();
+            return;
+        }
+
+        if (_wall.WindowState == FormWindowState.Minimized)
+        {
+            _wall.WindowState = FormWindowState.Normal;
+        }
+
+        _wall.Activate();
+    }
+
     private void Show(HerdrSnapshot snapshot)
     {
+        _snapshot = snapshot;
+        _wall?.Apply(snapshot);
+
         TrayState state = snapshot.State;
         if (_shownState != state)
         {
@@ -118,7 +144,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return text.ToString();
     }
 
-    private static string Label(AgentState state) => state switch
+    internal static string Label(AgentState state) => state switch
     {
         AgentState.Blocked => "needs input",
         AgentState.Working => "working",
@@ -134,6 +160,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+
+        _wall?.Dispose();
 
         foreach (Icon icon in _icons.Values)
         {
