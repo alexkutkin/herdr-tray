@@ -2,13 +2,13 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Join-Path $root 'bin\Release\net9.0-windows\HerdrTray.exe'
+$exe = Join-Path $root 'bin\Release\net48\Herdr Tray Utility.exe'
 if (!(Test-Path -LiteralPath $exe)) {
     throw "Executable not found: $exe. Run dotnet build -c Release first."
 }
 
 $desktop = [Environment]::GetFolderPath('Desktop')
-$shortcutPath = Join-Path $desktop 'Herdr Tray.lnk'
+$shortcutPath = Join-Path $desktop 'Herdr Tray Utility.lnk'
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $exe

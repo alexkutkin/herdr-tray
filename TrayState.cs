@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace HerdrTray;
 
 /// <summary>Aggregated state of the tray icon, declared in priority order.</summary>
@@ -18,7 +22,18 @@ internal enum AgentState
     Unknown,
 }
 
-internal readonly record struct AgentInfo(string Name, AgentState State);
+internal readonly struct AgentInfo
+{
+    public AgentInfo(string name, AgentState state)
+    {
+        Name = name;
+        State = state;
+    }
+
+    public string Name { get; }
+
+    public AgentState State { get; }
+}
 
 internal static class AgentStates
 {
@@ -30,9 +45,19 @@ internal static class AgentStates
     };
 }
 
-internal sealed record HerdrSnapshot(bool Connected, IReadOnlyList<AgentInfo> Agents)
+internal sealed class HerdrSnapshot
 {
-    public static readonly HerdrSnapshot Disconnected = new(false, []);
+    public static readonly HerdrSnapshot Disconnected = new HerdrSnapshot(false, Array.Empty<AgentInfo>());
+
+    public HerdrSnapshot(bool connected, IReadOnlyList<AgentInfo> agents)
+    {
+        Connected = connected;
+        Agents = agents;
+    }
+
+    public bool Connected { get; }
+
+    public IReadOnlyList<AgentInfo> Agents { get; }
 
     public TrayState State =>
         !Connected ? TrayState.Disconnected

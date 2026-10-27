@@ -1,6 +1,11 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace HerdrTray;
 
@@ -19,16 +24,17 @@ internal sealed class StatusWallForm : Form
     private static readonly Color TextPrimary = Color.FromArgb(0xE8, 0xE8, 0xE8);
     private static readonly Color AlertInk = Color.FromArgb(0x1A, 0x13, 0x00);
 
-    private readonly Dictionary<TrayState, Icon> _windowIcons = TrayIcons.Create(32);
-    private readonly FlowLayoutPanel _footer;
-    private readonly CheckBox _keepAwake;
-    private readonly CheckBox _onTop;
+    private readonly Icon _appIcon = AppIcon.Load(32);
+    private readonly AppSettings _settings;
 
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
 
-    public StatusWallForm()
+    public StatusWallForm(AppSettings settings)
     {
-        Text = "Herdr";
+        _settings = settings;
+
+        Text = "Herdr Tray Utility";
+        Icon = _appIcon;
         BackColor = Background;
         ForeColor = TextPrimary;
         StartPosition = FormStartPosition.CenterScreen;
@@ -36,46 +42,24 @@ internal sealed class StatusWallForm : Form
         MinimumSize = new Size(320, 240);
         DoubleBuffered = true;
         KeyPreview = true;
-
-        _keepAwake = Option("Keep the screen awake", check: true);
-        _keepAwake.CheckedChanged += (_, _) => UpdateKeepAwake();
-
-        _onTop = Option("Always on top", check: false);
-        _onTop.CheckedChanged += (_, _) => TopMost = _onTop.Checked;
-
-        _footer = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom,
-            Height = 36,
-            BackColor = Background,
-            Padding = new Padding(Gap, 8, 0, 0),
-            WrapContents = false,
-        };
-        _footer.Controls.Add(_keepAwake);
-        _footer.Controls.Add(_onTop);
-        Controls.Add(_footer);
+        TopMost = settings.AlwaysOnTop;
 
         Apply(_snapshot);
     }
 
-    private static CheckBox Option(string text, bool check) => new()
-    {
-        Text = text,
-        Checked = check,
-        AutoSize = true,
-        BackColor = Background,
-        ForeColor = Color.FromArgb(0xA8, 0xA8, 0xB0),
-        Margin = new Padding(0, 0, 24, 0),
-    };
-
     public void Apply(HerdrSnapshot snapshot)
     {
         _snapshot = snapshot;
-        Icon = _windowIcons[snapshot.State];
         if (Visible)
         {
             Invalidate();
         }
+    }
+
+    public void ApplySettings()
+    {
+        TopMost = _settings.AlwaysOnTop;
+        UpdateKeepAwake();
     }
 
     // A light title bar over a dark wall looks broken; ignored on Windows versions without it.
@@ -119,17 +103,14 @@ internal sealed class StatusWallForm : Form
         if (disposing)
         {
             SetThreadExecutionState(EsContinuous);
-            foreach (Icon icon in _windowIcons.Values)
-            {
-                icon.Dispose();
-            }
+            _appIcon.Dispose();
         }
 
         base.Dispose(disposing);
     }
 
     private void UpdateKeepAwake() =>
-        SetThreadExecutionState(Visible && _keepAwake.Checked
+        SetThreadExecutionState(Visible && _settings.KeepAwake
             ? EsContinuous | EsDisplayRequired
             : EsContinuous);
 
@@ -140,7 +121,7 @@ internal sealed class StatusWallForm : Form
         graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         graphics.Clear(Background);
 
-        var area = new RectangleF(0, 0, ClientSize.Width, ClientSize.Height - _footer.Height);
+        var area = new RectangleF(0, 0, ClientSize.Width, ClientSize.Height);
         if (!_snapshot.Connected)
         {
             DrawMessage(graphics, area, "Disconnected", TrayIcons.ColorOf(TrayState.Disconnected));
@@ -161,7 +142,7 @@ internal sealed class StatusWallForm : Form
     private static void DrawTiles(Graphics graphics, RectangleF area, List<AgentInfo> agents)
     {
         int count = agents.Count;
-        int columns = Math.Clamp((int)Math.Round(Math.Sqrt(count * area.Width / Math.Max(1f, area.Height))), 1, count);
+        int columns = Clamp((int)Math.Round(Math.Sqrt(count * area.Width / Math.Max(1f, area.Height))), 1, count);
         int rows = (int)Math.Ceiling(count / (double)columns);
         columns = (int)Math.Ceiling(count / (double)rows);
 
@@ -208,8 +189,8 @@ internal sealed class StatusWallForm : Form
             Trimming = StringTrimming.EllipsisCharacter,
             FormatFlags = StringFormatFlags.NoWrap,
         };
-        using var nameFont = new Font("Segoe UI", Math.Clamp(rect.Height * 0.11f, 9f, 56f), FontStyle.Bold, GraphicsUnit.Pixel);
-        using var stateFont = new Font("Segoe UI", Math.Clamp(rect.Height * 0.085f, 8f, 40f), FontStyle.Regular, GraphicsUnit.Pixel);
+        using var nameFont = new Font("Segoe UI", Clamp(rect.Height * 0.11f, 9f, 56f), FontStyle.Bold, GraphicsUnit.Pixel);
+        using var stateFont = new Font("Segoe UI", Clamp(rect.Height * 0.085f, 8f, 40f), FontStyle.Regular, GraphicsUnit.Pixel);
         using var nameBrush = new SolidBrush(ink);
         using var stateBrush = new SolidBrush(alert ? ink : accent);
 
@@ -228,10 +209,14 @@ internal sealed class StatusWallForm : Form
         }
 
         using var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-        using var font = new Font("Segoe UI", Math.Clamp(area.Height * 0.09f, 10f, 64f), FontStyle.Bold, GraphicsUnit.Pixel);
+        using var font = new Font("Segoe UI", Clamp(area.Height * 0.09f, 10f, 64f), FontStyle.Bold, GraphicsUnit.Pixel);
         using var textBrush = new SolidBrush(color);
         graphics.DrawString(text, font, textBrush, new RectangleF(area.X, area.Y + area.Height * 0.62f, area.Width, area.Height * 0.18f), format);
     }
+
+    private static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max);
+
+    private static float Clamp(float value, float min, float max) => Math.Min(Math.Max(value, min), max);
 
     private static GraphicsPath RoundedRectangle(RectangleF rect, float radius)
     {

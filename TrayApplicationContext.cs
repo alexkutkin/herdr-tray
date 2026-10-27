@@ -1,4 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace HerdrTray;
 
@@ -6,28 +12,48 @@ namespace HerdrTray;
 internal sealed class TrayApplicationContext : ApplicationContext
 {
     private const int PollIntervalMs = 2000;
-    private const int MaxTooltipLength = 127; // NotifyIcon.Text limit
-    private const string Header = "Herdr";
+    private const int MaxTooltipLength = 63; // .NET Framework throws above 63, unlike the shell's 127
+    private const string Header = "Herdr Tray Utility";
 
-    private readonly Dictionary<TrayState, Icon> _icons = TrayIcons.Create();
+    private readonly Dictionary<TrayState, Icon> _icons;
+    private readonly AppSettings _settings = AppSettings.Load();
+    private readonly ContextMenuStrip _menu;
     private readonly NotifyIcon _notifyIcon;
     private readonly System.Windows.Forms.Timer _timer;
 
     private StatusWallForm? _wall;
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
-    private TrayState? _shownState;
-    private string _shownTooltip = string.Empty;
+    private TrayState? _shownState = TrayState.Disconnected;
+    private bool _settingsOpen;
     private bool _polling;
     private bool _exiting;
 
     public TrayApplicationContext()
     {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Status", null, (_, _) => ShowWall());
-        menu.Items.Add("Exit", null, (_, _) => Exit());
+        // A moved portable folder keeps autostart working: rewrite the stored path on every launch.
+        if (Autostart.IsEnabled)
+        {
+            Autostart.TrySetEnabled(true);
+        }
 
-        _notifyIcon = new NotifyIcon { ContextMenuStrip = menu };
-        Show(HerdrSnapshot.Disconnected);
+        _menu = TrayMenu.Create(ShowWall, ShowSettings, Exit);
+        _icons = TrayIcons.Create();
+
+        // Stay neutral until the first poll: a wrong "Disconnected" would stick in the shell's cache.
+        _notifyIcon = new NotifyIcon
+        {
+            ContextMenuStrip = _menu,
+            Icon = _icons[TrayState.Disconnected],
+            Text = Header,
+        };
+        _notifyIcon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                ShowWall();
+            }
+        };
+        _notifyIcon.DoubleClick += (_, _) => ShowWall();
         _notifyIcon.Visible = true;
 
         _timer = new System.Windows.Forms.Timer { Interval = PollIntervalMs };
@@ -62,7 +88,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     /// <summary>Opens the status wall, or brings it back if it is already open.</summary>
     private void ShowWall()
     {
-        _wall ??= new StatusWallForm();
+        _wall ??= new StatusWallForm(_settings);
         _wall.Apply(_snapshot);
 
         if (!_wall.Visible)
@@ -79,6 +105,34 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _wall.Activate();
     }
 
+    private void ShowSettings()
+    {
+        if (_settingsOpen)
+        {
+            return;
+        }
+
+        _settingsOpen = true;
+        try
+        {
+            using var form = new SettingsForm(_settings, ApplySettings);
+            if (_wall is { Visible: true })
+            {
+                form.ShowDialog(_wall);
+            }
+            else
+            {
+                form.ShowDialog();
+            }
+        }
+        finally
+        {
+            _settingsOpen = false;
+        }
+    }
+
+    private void ApplySettings() => _wall?.ApplySettings();
+
     private void Show(HerdrSnapshot snapshot)
     {
         _snapshot = snapshot;
@@ -92,9 +146,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         string tooltip = BuildTooltip(snapshot);
-        if (tooltip != _shownTooltip)
+        if (tooltip != _notifyIcon.Text)
         {
-            _shownTooltip = tooltip;
             _notifyIcon.Text = tooltip;
         }
     }
@@ -105,9 +158,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         switch (snapshot.State)
         {
             case TrayState.Disconnected:
-                return Compose(["Disconnected"], hidden: 0);
+                return Compose(new[] { "Disconnected" }, hidden: 0);
             case TrayState.Idle:
-                return Compose(["Idle"], hidden: 0);
+                return Compose(new[] { "Idle" }, hidden: 0);
         }
 
         // OrderBy is stable, so Herdr's own order survives inside each state group.
@@ -125,7 +178,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             }
         }
 
-        return Compose([], lines.Count);
+        return Compose(Array.Empty<string>(), lines.Count);
     }
 
     private static string Compose(IEnumerable<string> lines, int hidden)
@@ -160,6 +213,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _menu.Dispose();
 
         _wall?.Dispose();
 

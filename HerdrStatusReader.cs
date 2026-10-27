@@ -1,6 +1,10 @@
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Text;
-using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace HerdrTray;
 
@@ -11,14 +15,14 @@ namespace HerdrTray;
 /// </summary>
 internal static class HerdrStatusReader
 {
-    private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(5);
+    private const int CallTimeoutMs = 5000;
     private const int MaxNameLength = 24;
 
     public static async Task<HerdrSnapshot> ReadAsync()
     {
         try
         {
-            string? json = await RunAsync();
+            string? json = await RunAsync().ConfigureAwait(false);
             return json is null ? HerdrSnapshot.Disconnected : Parse(json);
         }
         catch
@@ -31,7 +35,7 @@ internal static class HerdrStatusReader
     {
         var startInfo = new ProcessStartInfo("herdr")
         {
-            ArgumentList = { "agent", "list" },
+            Arguments = "agent list",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -50,56 +54,75 @@ internal static class HerdrStatusReader
         Task<string> stdout = process.StandardOutput.ReadToEndAsync();
         Task<string> stderr = process.StandardError.ReadToEndAsync();
 
-        using var timeout = new CancellationTokenSource(CallTimeout);
-        try
+        bool exited = await Task.Run(() => process.WaitForExit(CallTimeoutMs)).ConfigureAwait(false);
+        if (!exited)
         {
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill(entireProcessTree: true);
+            try
+            {
+                process.Kill();
+            }
+            catch
+            {
+                // Already gone.
+            }
+
             return null;
         }
 
-        await stderr;
-        return process.ExitCode == 0 ? await stdout : null;
+        await stderr.ConfigureAwait(false);
+        return process.ExitCode == 0 ? await stdout.ConfigureAwait(false) : null;
     }
 
     private static HerdrSnapshot Parse(string json)
     {
-        using var document = JsonDocument.Parse(json);
+        var serializer = new DataContractJsonSerializer(typeof(HerdrResponse));
+        HerdrResponse? response;
+        using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(json)))
+        {
+            response = (HerdrResponse)serializer.ReadObject(stream);
+        }
 
         // An error response has no "result", e.g. {"error":{"code":"..."},"id":"cli:agent:list"}.
-        if (!document.RootElement.TryGetProperty("result", out JsonElement result) ||
-            !result.TryGetProperty("agents", out JsonElement agents) ||
-            agents.ValueKind != JsonValueKind.Array)
+        List<HerdrAgent>? agents = response?.Result?.Agents;
+        if (agents is null)
         {
             return HerdrSnapshot.Disconnected;
         }
 
         var list = new List<AgentInfo>();
-        foreach (JsonElement agent in agents.EnumerateArray())
+        foreach (HerdrAgent agent in agents)
         {
-            list.Add(new AgentInfo(NameOf(agent), StateOf(agent)));
+            if (agent != null)
+            {
+                list.Add(new AgentInfo(NameOf(agent), StateOf(agent)));
+            }
         }
 
         return new HerdrSnapshot(true, list);
     }
 
-    private static string NameOf(JsonElement agent)
+    private static string NameOf(HerdrAgent agent)
     {
-        string? name = Text(agent, "name") ?? Text(agent, "display_agent") ?? Text(agent, "agent");
-        if (string.IsNullOrWhiteSpace(name))
+        string name = FirstNonEmpty(agent.Name, agent.DisplayAgent, agent.Agent) ?? "Agent";
+        name = char.ToUpperInvariant(name[0]) + name.Substring(1);
+        return name.Length <= MaxNameLength ? name : name.Substring(0, MaxNameLength - 1) + "…";
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (string? value in values)
         {
-            return "Agent";
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
         }
 
-        name = char.ToUpperInvariant(name[0]) + name[1..];
-        return name.Length <= MaxNameLength ? name : name[..(MaxNameLength - 1)] + "…";
+        return null;
     }
 
     // Herdr's `done` means "finished, ready for input", so it is idle for our purposes.
-    private static AgentState StateOf(JsonElement agent) => Text(agent, "agent_status") switch
+    private static AgentState StateOf(HerdrAgent agent) => agent.AgentStatus switch
     {
         "blocked" => AgentState.Blocked,
         "working" => AgentState.Working,
@@ -107,8 +130,33 @@ internal static class HerdrStatusReader
         _ => AgentState.Unknown,
     };
 
-    private static string? Text(JsonElement element, string property) =>
-        element.TryGetProperty(property, out JsonElement value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
+    [DataContract]
+    private sealed class HerdrResponse
+    {
+        [DataMember(Name = "result")]
+        public HerdrResult? Result { get; set; }
+    }
+
+    [DataContract]
+    private sealed class HerdrResult
+    {
+        [DataMember(Name = "agents")]
+        public List<HerdrAgent>? Agents { get; set; }
+    }
+
+    [DataContract]
+    private sealed class HerdrAgent
+    {
+        [DataMember(Name = "name")]
+        public string? Name { get; set; }
+
+        [DataMember(Name = "display_agent")]
+        public string? DisplayAgent { get; set; }
+
+        [DataMember(Name = "agent")]
+        public string? Agent { get; set; }
+
+        [DataMember(Name = "agent_status")]
+        public string? AgentStatus { get; set; }
+    }
 }

@@ -1,5 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace HerdrTray;
 
@@ -18,11 +23,11 @@ internal static class TrayIcons
         [TrayState.Disconnected] = Color.FromArgb(0xFF, 0x4D, 0x4F),
     };
 
-    public static Dictionary<TrayState, Icon> Create() =>
-        Create(Math.Max(16, SystemInformation.SmallIconSize.Width));
-
-    public static Dictionary<TrayState, Icon> Create(int size) =>
-        Palette.ToDictionary(entry => entry.Key, entry => Draw(entry.Key, entry.Value, size));
+    public static Dictionary<TrayState, Icon> Create()
+    {
+        int size = Math.Max(16, SystemInformation.SmallIconSize.Width);
+        return Palette.ToDictionary(entry => entry.Key, entry => Draw(entry.Key, entry.Value, size));
+    }
 
     public static Color ColorOf(TrayState state) => Palette[state];
 
@@ -55,10 +60,10 @@ internal static class TrayIcons
     private static void DrawH(Graphics graphics, Brush brush, int size)
     {
         float stroke = Stroke(size);
-        float left = MathF.Round(size * 0.09f);
-        float right = MathF.Round(size * 0.56f);
-        float top = MathF.Round(size * 0.19f);
-        float bottom = MathF.Round(size * 0.81f);
+        float left = Round(size * 0.09f);
+        float right = Round(size * 0.56f);
+        float top = Round(size * 0.19f);
+        float bottom = Round(size * 0.81f);
 
         graphics.FillRectangle(brush, left, top, stroke, bottom - top);
         graphics.FillRectangle(brush, right - stroke, top, stroke, bottom - top);
@@ -67,18 +72,18 @@ internal static class TrayIcons
 
     private static void DrawDot(Graphics graphics, Brush brush, int size)
     {
-        float diameter = MathF.Round(size * 0.34f);
-        float offset = size - diameter - MathF.Round(size * 0.06f);
+        float diameter = Round(size * 0.34f);
+        float offset = size - diameter - Round(size * 0.06f);
         graphics.FillEllipse(brush, offset, offset, diameter, diameter);
     }
 
     private static void DrawBang(Graphics graphics, Brush brush, int size)
     {
         float stroke = Stroke(size);
-        float x = size - stroke - MathF.Round(size * 0.12f);
-        float top = MathF.Round(size * 0.25f);
-        float barBottom = MathF.Round(size * 0.62f);
-        float dotTop = MathF.Round(size * 0.74f);
+        float x = size - stroke - Round(size * 0.12f);
+        float top = Round(size * 0.25f);
+        float barBottom = Round(size * 0.62f);
+        float dotTop = Round(size * 0.74f);
 
         graphics.FillRectangle(brush, x, top, stroke, barBottom - top);
         graphics.FillRectangle(brush, x, dotTop, stroke, stroke);
@@ -96,7 +101,9 @@ internal static class TrayIcons
         graphics.DrawLine(pen, left, bottom, right, top);
     }
 
-    private static float Stroke(int size) => MathF.Max(2f, MathF.Round(size * 0.13f));
+    private static float Stroke(int size) => Math.Max(2f, Round(size * 0.13f));
+
+    private static float Round(float value) => (float)Math.Round(value);
 
     private static Icon ToIcon(Bitmap bitmap)
     {
