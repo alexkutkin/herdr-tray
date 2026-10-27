@@ -6,7 +6,7 @@ using System.Windows.Forms;
 namespace HerdrTray;
 
 /// <summary>
-/// The tray shortcut menu: the default command first and bold, then Exit. Standard Windows
+/// The tray shortcut menu: Status first and bold, then About and Exit. Standard Windows
 /// menu rendering in the app's dark palette; the options live on the status wall itself.
 /// </summary>
 internal static class TrayMenu
@@ -39,14 +39,26 @@ internal static class TrayMenu
         menu.Disposed += (_, _) => bold.Dispose();
 
         var status = new ToolStripMenuItem("Status", null, (_, _) => showWall()) { Font = bold };
+        var about = new ToolStripMenuItem("About", null, (_, _) => ShowAbout());
         var quit = new ToolStripMenuItem("Exit", null, (_, _) => exit());
 
         menu.Items.Add(status);
+        menu.Items.Add(about);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(quit);
 
         menu.Opened += (_, _) => KeepAboveTaskbar(menu);
         return menu;
+    }
+
+    private static void ShowAbout()
+    {
+        MessageBox.Show(
+            $"{Application.ProductName}\nVersion {Application.ProductVersion}\nBy {Application.CompanyName}\n\n" +
+            "MIT licensed.\nUnofficial tool, not affiliated with Herdr.",
+            $"About {Application.ProductName}",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
     }
 
     // Notification-area menus open upward and stay clear of the taskbar, unlike the

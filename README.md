@@ -1,49 +1,92 @@
+<div align="center">
+
 # Herdr Tray Utility
 
-A notification-area icon that shows what Herdr agents are doing. No window unless you ask for one.
+Herdr agent status in the Windows notification area.
 
-- Polls `herdr agent list` (JSON output) every 2 seconds.
-- Icon: `H` idle (grey), `H*` working (blue), `H!` needs attention (amber), `Hx` disconnected (red).
-- Hover shows one line per agent, agents that need input first, trimmed to the 63 character tooltip limit.
-- Click or double-click opens the status wall. Right click: Status and Exit.
+By [alexkutkin](https://github.com/alexkutkin) · [MIT](LICENSE) · Unofficial, not affiliated with Herdr
 
-## Options
+</div>
 
-The bottom of the status wall carries the three options as switches; each click applies
-and is saved at once, with no separate settings window:
+A tray icon shows whether your agents are idle, working, waiting for input, or disconnected.
+Click it to open a resizable status wall. No installer or account required.
 
-- `Keep the screen awake`, on by default, holds the display on while the wall is open
-  (`SetThreadExecutionState`). It does not override a corporate inactivity lock policy.
-- `Always on top`, off by default, keeps the wall above other windows.
-- `Start with Windows` writes a per-user `Run` entry pointing at the current exe, so
-  no shortcut is needed. If you move the portable folder and launch the exe again, the
-  entry follows. Turn the option off before deleting the folder.
+## Run
 
-## Status wall
+Requires **Windows 10 22H2 or Windows 11, 64-bit**, .NET Framework 4.8 or a later
+4.x update, and [Herdr](https://herdr.dev/) on PATH. The listed Windows versions
+already include a compatible .NET Framework runtime.
 
-Click the icon or choose Status: a resizable wallboard with one tile per agent and a
-big coloured circle, sized to the window, so it stays readable from across the room.
-Agents that need input come first and their whole tile is filled amber. The cross
-hides the wall and the tray icon keeps polling; Esc does the same.
+1. Download `Herdr Tray Utility-<version>-portable.zip` from this repository's **Releases** tab.
+2. Extract the folder and run `Herdr Tray Utility.exe`. Keep the `.exe.config` file next to it.
+3. Look in the notification-area overflow if the icon is hidden.
 
-## Build and run
+Builds are unsigned, so Windows may warn about an unknown publisher.
 
-```bash
-dotnet build
-dotnet run
+**Compatibility:** tested with Herdr **0.9.5** on Windows. The app reads JSON from
+[`herdr agent list`](https://herdr.dev/docs/cli-reference/). Other versions have not been verified.
+
+## Use
+
+| Tray icon | Status |
+| --- | --- |
+| Grey H | Idle |
+| Blue H with a dot | Working |
+| Amber H with ! | Needs input |
+| Red H with x | Cannot read Herdr |
+
+Statuses refresh every two seconds. Agents needing input appear first in the wall.
+If the icon stays red, check that `herdr agent list` works in your terminal.
+
+Click the icon to open the wall. Esc or the close button hides it.
+Right-click for **Status**, **About** (version and author), or **Exit**.
+
+The wall has three switches, saved as you change them:
+
+- **Keep the screen awake:** on by default, holds the display on while the wall is visible.
+  Corporate lock policies still apply.
+- **Always on top:** off by default, keeps the wall above other windows.
+- **Start with Windows:** off on first use, starts the app when you sign in.
+  If you move its folder, launch the EXE again to refresh the startup path.
+
+To update, exit the app and replace its files with the new ZIP contents.
+To remove it, disable **Start with Windows**, exit, and delete the folder.
+Settings remain in `HKEY_CURRENT_USER\Software\HerdrTray`; delete that key to reset them.
+Settings do not travel with the folder.
+
+## Build and package
+
+On Windows, install the [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+and [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48).
+Exit the tray app before building.
+
+```powershell
+dotnet build -c Debug
+dotnet build -c Release
+dotnet run -c Debug --no-build
 ```
 
-Requires .NET Framework 4.8 (included in Windows 10 and 11) and `herdr` on PATH.
-
-## Package
+To make the release ZIP, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\package.ps1
 ```
 
-Builds Release and produces `dist\Herdr Tray Utility-<version>-portable.zip` with the exe,
-its config and a short readme.
+This builds both configurations and packages Release into
+`dist\Herdr Tray Utility-<version>-portable.zip`, with its config, README and license.
+The version comes from `HerdrTray.csproj`, including the version shown in **About**.
 
-## License
+For a release, set `<Version>` in the project, package it, and try the extracted ZIP.
+Commit and push the matching source revision, then create a GitHub Release with a
+matching tag (for example `v1.0.1`) and attach the ZIP. Builds and uploads are manual.
 
-MIT. Unofficial tool, not affiliated with Herdr.
+## Tests
+
+Six checks cover builds, ZIP contents, metadata, configuration and version handling:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1
+```
+
+Results and logs go to `TestResults`. The app can stay running.
+For UI checks, see the [verification skill](.agents/skills/verify-herdr-tray/SKILL.md).
