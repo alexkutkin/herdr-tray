@@ -5,17 +5,16 @@ A notification-area icon that shows what Herdr agents are doing. No window unles
 - Polls `herdr agent list` (JSON output) every 2 seconds.
 - Icon: `H` idle (grey), `H*` working (blue), `H!` needs attention (amber), `Hx` disconnected (red).
 - Hover shows one line per agent, agents that need input first, trimmed to the 63 character tooltip limit.
-- Click or double-click opens the status wall. Right click has three items: Status, Settings and Exit.
+- Click or double-click opens the status wall. Right click: Status and Exit.
 
-## Settings
+## Options
 
-The tray menu's Settings opens a small window with three options, saved per user
-and applied immediately:
+The bottom of the status wall carries the three options as switches; each click applies
+and is saved at once, with no separate settings window:
 
-- `Keep the screen awake while the wall is open`, on by default, holds the display on
-  while the wall is open (`SetThreadExecutionState`). It does not override a corporate
-  inactivity lock policy.
-- `Keep the wall always on top`, off by default, keeps the wall above other windows.
+- `Keep the screen awake`, on by default, holds the display on while the wall is open
+  (`SetThreadExecutionState`). It does not override a corporate inactivity lock policy.
+- `Always on top`, off by default, keeps the wall above other windows.
 - `Start with Windows` writes a per-user `Run` entry pointing at the current exe, so
   no shortcut is needed. If you move the portable folder and launch the exe again, the
   entry follows. Turn the option off before deleting the folder.

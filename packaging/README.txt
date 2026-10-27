@@ -17,13 +17,14 @@ Run
    hidden overflow first; drag it out once if you want it always visible.
 
 Click the icon to open the wallboard, or double-click it. Right-click the
-icon: Status opens the wallboard, Settings opens the options, Exit quits.
+icon: Status opens the wallboard, Exit quits.
 
-Settings
---------
-The Settings window holds three options, saved per user and applied at once:
-- Keep the screen awake while the wall is open.
-- Keep the wall always on top.
+Options
+-------
+The bottom of the wallboard holds three switches. Each click applies and is
+saved per user at once:
+- Keep the screen awake: holds the display on while the wallboard is open.
+- Always on top: keeps the wallboard above other windows.
 - Start with Windows: no shortcut is needed, and the entry follows the exe
   if you move the folder. Turn it off before deleting this folder; everything
   else is removed with the folder.

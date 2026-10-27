@@ -24,7 +24,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private StatusWallForm? _wall;
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
     private TrayState? _shownState = TrayState.Disconnected;
-    private bool _settingsOpen;
     private bool _polling;
     private bool _exiting;
 
@@ -36,7 +35,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Autostart.TrySetEnabled(true);
         }
 
-        _menu = TrayMenu.Create(ShowWall, ShowSettings, Exit);
+        _menu = TrayMenu.Create(ShowWall, Exit);
         _icons = TrayIcons.Create();
 
         // Stay neutral until the first poll: a wrong "Disconnected" would stick in the shell's cache.
@@ -104,34 +103,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _wall.Activate();
     }
-
-    private void ShowSettings()
-    {
-        if (_settingsOpen)
-        {
-            return;
-        }
-
-        _settingsOpen = true;
-        try
-        {
-            using var form = new SettingsForm(_settings, ApplySettings);
-            if (_wall is { Visible: true })
-            {
-                form.ShowDialog(_wall);
-            }
-            else
-            {
-                form.ShowDialog();
-            }
-        }
-        finally
-        {
-            _settingsOpen = false;
-        }
-    }
-
-    private void ApplySettings() => _wall?.ApplySettings();
 
     private void Show(HerdrSnapshot snapshot)
     {

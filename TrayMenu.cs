@@ -6,15 +6,15 @@ using System.Windows.Forms;
 namespace HerdrTray;
 
 /// <summary>
-/// The tray shortcut menu: Status, Settings, Exit. Standard Windows menu rendering —
-/// the same shape and metrics as other notification-area utilities — in the app's dark palette.
+/// The tray shortcut menu: the default command first and bold, then Exit. Standard Windows
+/// menu rendering in the app's dark palette; the options live on the status wall itself.
 /// </summary>
 internal static class TrayMenu
 {
     private const int DwmWindowCornerPreference = 33;
     private const int DwmRound = 2;
 
-    public static ContextMenuStrip Create(Action showWall, Action showSettings, Action exit)
+    public static ContextMenuStrip Create(Action showWall, Action exit)
     {
         bool dark = !SystemInformation.HighContrast;
 
@@ -39,11 +39,9 @@ internal static class TrayMenu
         menu.Disposed += (_, _) => bold.Dispose();
 
         var status = new ToolStripMenuItem("Status", null, (_, _) => showWall()) { Font = bold };
-        var settings = new ToolStripMenuItem("Settings", null, (_, _) => showSettings());
         var quit = new ToolStripMenuItem("Exit", null, (_, _) => exit());
 
         menu.Items.Add(status);
-        menu.Items.Add(settings);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(quit);
 

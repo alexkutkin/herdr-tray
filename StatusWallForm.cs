@@ -23,11 +23,17 @@ internal sealed class StatusWallForm : Form
     private static readonly Color TileBackground = Color.FromArgb(0x24, 0x24, 0x28);
     private static readonly Color TextPrimary = Color.FromArgb(0xE8, 0xE8, 0xE8);
     private static readonly Color AlertInk = Color.FromArgb(0x1A, 0x13, 0x00);
+    private static readonly Color Divider = Color.FromArgb(0x3A, 0x3A, 0x40);
 
     private readonly Icon _appIcon = AppIcon.Load(32);
     private readonly AppSettings _settings;
+    private readonly CheckBox _keepAwake;
+    private readonly CheckBox _onTop;
+    private readonly CheckBox _autostart;
+    private readonly FlowLayoutPanel _optionsBar;
 
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
+    private bool _revertingAutostart;
 
     public StatusWallForm(AppSettings settings)
     {
@@ -44,6 +50,43 @@ internal sealed class StatusWallForm : Form
         KeyPreview = true;
         TopMost = settings.AlwaysOnTop;
 
+        // Options sit on the wall itself, so they are one click away while the agents are in view.
+        _keepAwake = Option("Keep the screen awake", settings.KeepAwake);
+        _keepAwake.CheckedChanged += (_, _) =>
+        {
+            _settings.KeepAwake = _keepAwake.Checked;
+            SaveAndApply();
+        };
+
+        _onTop = Option("Always on top", settings.AlwaysOnTop);
+        _onTop.CheckedChanged += (_, _) =>
+        {
+            _settings.AlwaysOnTop = _onTop.Checked;
+            SaveAndApply();
+        };
+
+        _autostart = Option("Start with Windows", Autostart.IsEnabled);
+        _autostart.CheckedChanged += (_, _) =>
+        {
+            if (_revertingAutostart)
+            {
+                return;
+            }
+
+            if (Autostart.TrySetEnabled(_autostart.Checked))
+            {
+                return;
+            }
+
+            _revertingAutostart = true;
+            _autostart.Checked = !_autostart.Checked;
+            _revertingAutostart = false;
+            MessageBox.Show(this, "Could not update the Windows startup setting.", "Herdr Tray Utility",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        };
+
+        _optionsBar = OptionsBar();
+        Controls.Add(_optionsBar);
         Apply(_snapshot);
     }
 
@@ -56,10 +99,47 @@ internal sealed class StatusWallForm : Form
         }
     }
 
-    public void ApplySettings()
+    private void ApplySettings()
     {
         TopMost = _settings.AlwaysOnTop;
         UpdateKeepAwake();
+    }
+
+    private void SaveAndApply()
+    {
+        _settings.Save();
+        ApplySettings();
+    }
+
+    private static ToggleSwitch Option(string text, bool check) => new()
+    {
+        Text = text,
+        Checked = check,
+        AutoSize = true,
+        BackColor = Background,
+        ForeColor = TextPrimary,
+        Font = SystemFonts.MenuFont,
+        Margin = new Padding(0, 3, 28, 3),
+    };
+
+    private FlowLayoutPanel OptionsBar()
+    {
+        var bar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
+            BackColor = Background,
+            Padding = new Padding(16, 10, 16, 10),
+        };
+        bar.Controls.AddRange(new Control[] { _keepAwake, _onTop, _autostart });
+        bar.Paint += (_, e) =>
+        {
+            using var pen = new Pen(Divider);
+            e.Graphics.DrawLine(pen, 0, 0, bar.Width, 0);
+        };
+        return bar;
     }
 
     // A light title bar over a dark wall looks broken; ignored on Windows versions without it.
@@ -73,6 +153,14 @@ internal sealed class StatusWallForm : Form
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
+        if (Visible)
+        {
+            // The Run entry can change while the wall is hidden; show its real state, don't write it.
+            _revertingAutostart = true;
+            _autostart.Checked = Autostart.IsEnabled;
+            _revertingAutostart = false;
+        }
+
         UpdateKeepAwake();
     }
 
@@ -121,7 +209,7 @@ internal sealed class StatusWallForm : Form
         graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         graphics.Clear(Background);
 
-        var area = new RectangleF(0, 0, ClientSize.Width, ClientSize.Height);
+        var area = new RectangleF(0, 0, ClientSize.Width, ClientSize.Height - _optionsBar.Height);
         if (!_snapshot.Connected)
         {
             DrawMessage(graphics, area, "Disconnected", TrayIcons.ColorOf(TrayState.Disconnected));
