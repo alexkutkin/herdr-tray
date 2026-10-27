@@ -91,6 +91,9 @@ try {
         $built = Get-FileHash -LiteralPath (Join-Path $scratch 'bin\Release\net48\Herdr Tray Utility.exe')
         $packed = Get-FileHash -LiteralPath (Join-Path $extracted 'Herdr Tray Utility.exe')
         Assert-True ($built.Hash -eq $packed.Hash) 'The packaged EXE differs from the Release build.'
+        $exeBytes = [IO.File]::ReadAllBytes((Join-Path $extracted 'Herdr Tray Utility.exe'))
+        $exeText = [Text.Encoding]::ASCII.GetString($exeBytes)
+        Assert-True ($exeText -notmatch '(?i)[a-z]:\\[^\x00\r\n]*\.pdb') 'The packaged EXE exposes an absolute debug-symbol path.'
     } $packageReady
 
     Invoke-Check 'PackageIncludesRuntimeConfigurationAndVersionedReadme' {
