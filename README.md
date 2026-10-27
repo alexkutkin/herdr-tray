@@ -11,7 +11,9 @@ By [alexkutkin](https://github.com/alexkutkin) · [MIT](LICENSE) · Unofficial, 
 A tray icon shows whether your agents are idle, working, waiting for input, or disconnected.
 Click it to open a resizable status wall. No installer or account required.
 
-![Status wall showing five Herdr agents](docs/images/status-wall.png)
+<p align="center">
+  <img src="docs/images/status-wall-screenshot.png" alt="Status wall showing five Herdr agents" width="550">
+</p>
 
 ## Run
 
