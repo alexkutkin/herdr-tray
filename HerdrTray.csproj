@@ -10,7 +10,7 @@
     <AssemblyName>Herdr Tray Utility</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Company>alexkutkin</Company>
     <Product>Herdr Tray Utility</Product>
