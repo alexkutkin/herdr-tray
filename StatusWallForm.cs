@@ -27,17 +27,21 @@ internal sealed class StatusWallForm : Form
 
     private readonly Icon _appIcon = AppIcon.Load(32);
     private readonly AppSettings _settings;
+    private readonly Action<bool> _setStrip;
     private readonly CheckBox _keepAwake;
     private readonly CheckBox _onTop;
     private readonly CheckBox _autostart;
+    private readonly CheckBox _strip;
     private readonly FlowLayoutPanel _optionsBar;
 
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
     private bool _revertingAutostart;
+    private bool _revertingStrip;
 
-    public StatusWallForm(AppSettings settings)
+    public StatusWallForm(AppSettings settings, Action<bool> setStrip)
     {
         _settings = settings;
+        _setStrip = setStrip;
 
         Text = "Herdr Tray Utility";
         Icon = _appIcon;
@@ -83,6 +87,19 @@ internal sealed class StatusWallForm : Form
             _revertingAutostart = false;
             MessageBox.Show(this, "Could not update the Windows startup setting.", "Herdr Tray Utility",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        };
+
+        _strip = Option("Progress strip", settings.StripEnabled);
+        _strip.CheckedChanged += (_, _) =>
+        {
+            if (_revertingStrip)
+            {
+                return;
+            }
+
+            _settings.StripEnabled = _strip.Checked;
+            SaveAndApply();
+            _setStrip(_strip.Checked);
         };
 
         _optionsBar = OptionsBar();
@@ -133,7 +150,7 @@ internal sealed class StatusWallForm : Form
             BackColor = Background,
             Padding = new Padding(16, 10, 16, 10),
         };
-        bar.Controls.AddRange(new Control[] { _keepAwake, _onTop, _autostart });
+        bar.Controls.AddRange(new Control[] { _keepAwake, _onTop, _autostart, _strip });
         bar.Paint += (_, e) =>
         {
             using var pen = new Pen(Divider);
@@ -159,6 +176,11 @@ internal sealed class StatusWallForm : Form
             _revertingAutostart = true;
             _autostart.Checked = Autostart.IsEnabled;
             _revertingAutostart = false;
+
+            // Same for the strip, which the application context can enable or disable elsewhere.
+            _revertingStrip = true;
+            _strip.Checked = _settings.StripEnabled;
+            _revertingStrip = false;
         }
 
         UpdateKeepAwake();

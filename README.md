@@ -45,13 +45,18 @@ If the icon stays red, check that `herdr agent list` works in your terminal.
 Click the icon to open the wall. Esc or the close button hides it.
 Right-click for **Status**, **About** (version and author), or **Exit**.
 
-The wall has three switches, saved as you change them:
+The wall has four switches, saved as you change them:
 
 - **Keep the screen awake:** on by default, holds the display on while the wall is visible.
   Corporate lock policies still apply.
 - **Always on top:** off by default, keeps the wall above other windows.
 - **Start with Windows:** off on first use, starts the app when you sign in.
   If you move its folder, launch the EXE again to refresh the startup path.
+- **Progress strip:** off by default, shows a thin always-on-top bar with one colour segment
+  per agent while anyone works. It appears on its own, hides about ten seconds after everyone
+  goes idle (needs-input agents pulse amber), and reappears with the next job. Drag it anywhere,
+  click it to open the wall, right-click it for the wall or to turn it off, and it remembers its
+  position between runs. It never steals focus or sits in the taskbar.
 
 To update, exit the app and replace its files with the new ZIP contents.
 To remove it, disable **Start with Windows**, exit, and delete the folder.

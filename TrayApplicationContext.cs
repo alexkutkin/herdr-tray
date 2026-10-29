@@ -22,6 +22,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly System.Windows.Forms.Timer _timer;
 
     private StatusWallForm? _wall;
+    private ProgressStripForm? _strip;
     private HerdrSnapshot _snapshot = HerdrSnapshot.Disconnected;
     private TrayState? _shownState = TrayState.Disconnected;
     private bool _polling;
@@ -59,6 +60,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _timer.Tick += async (_, _) => await PollAsync();
         _timer.Start();
 
+        if (_settings.StripEnabled)
+        {
+            StartStrip();
+        }
+
         _ = PollAsync();
     }
 
@@ -87,7 +93,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     /// <summary>Opens the status wall, or brings it back if it is already open.</summary>
     private void ShowWall()
     {
-        _wall ??= new StatusWallForm(_settings);
+        _wall ??= new StatusWallForm(_settings, SetStripEnabled);
         _wall.Apply(_snapshot);
 
         if (!_wall.Visible)
@@ -108,6 +114,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _snapshot = snapshot;
         _wall?.Apply(snapshot);
+        _strip?.Apply(snapshot);
 
         TrayState state = snapshot.State;
         if (_shownState != state)
@@ -176,6 +183,34 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _ => "unknown",
     };
 
+    /// <summary>Turns the progress strip on or off; the single writer of the StripEnabled option.</summary>
+    private void SetStripEnabled(bool enabled)
+    {
+        _settings.StripEnabled = enabled;
+        _settings.Save();
+
+        if (enabled)
+        {
+            StartStrip();
+        }
+        else
+        {
+            _strip?.SetEnabled(false);
+        }
+    }
+
+    private void StartStrip()
+    {
+        if (_strip is null)
+        {
+            _strip = new ProgressStripForm(ShowWall, () => SetStripEnabled(false));
+            _strip.RestoreLocation();
+        }
+
+        _strip.SetEnabled(true);
+        _strip.Apply(_snapshot);
+    }
+
     private void Exit()
     {
         _exiting = true;
@@ -187,6 +222,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Dispose();
 
         _wall?.Dispose();
+        _strip?.Dispose();
 
         foreach (Icon icon in _icons.Values)
         {
